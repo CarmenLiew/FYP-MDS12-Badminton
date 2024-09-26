@@ -19,7 +19,7 @@ from collections import deque
 
 
 class ObjectDetection():
-    def __init__(self, capture, result, court, tracknet_file):
+    def __init__(self, capture, result, court, tracknet_file, scale_factor=59.7):
         self.capture_path = capture  # Store the path to the video file
         self.result = result
         self.court = court  # court coordinates (xmin, ymin, xmax, ymax)
@@ -38,15 +38,12 @@ class ObjectDetection():
         self.tracknet.eval()
         
         # Predefined colors for specific players
-        self.color_list = {
-            1: (0, 255, 0),   # Green for Player 1
-            2: (255, 255, 0), # Yellow for Player 2
-            3: (0, 0, 255),   # Red for Player 3 (default if more players are present)
-            4: (255, 0, 0)    # Blue for Player 4 (default if more players are present)
-        }
+        self.default_color =  (255, 0, 0) # set default colour to dark blue
 
         # keep track of the current closest player to the shuttlecock for drawing the black bounding box
         self.current_closest = None
+
+        self.scale_factor = scale_factor
 
     def load_model(self):
         model = YOLO("yolov8l.pt")
@@ -103,32 +100,20 @@ class ObjectDetection():
                 if self.current_closest is not None and id == self.current_closest: # if the current box being drawn is the closest player's
                     color = (0,0,0) # make the bounding box black
                 else: # else keep their original colour
-                    self.player_colors[id] = self.color_list[id]
+                    self.player_colors[id] = self.default_color
                     color = self.player_colors[id]
 
-            else:
-                color = self.color_list.get(id, (0, 0, 255))  # Default to Red if no specific color
+                # Save player center coordinates
+                player_positions[id] = (cx, cy)
 
-
-            # Save player center coordinates
-            player_positions[id] = (cx, cy)
-
-            # Draw the player box and ID
-            cvzone.putTextRect(img, f'Player: {id}', (x1, y1), scale=1, thickness=1, colorR=color)
-            cvzone.cornerRect(img, (x1, y1, w, h), l=9, rt=1, colorR=color)
-            cv2.circle(img, (cx, cy), 5, color, cv2.FILLED)
+                # Draw the player box and ID
+                cvzone.putTextRect(img, f'Player: {id}', (x1, y1), scale=1, thickness=1, colorR=color)
+                cvzone.cornerRect(img, (x1, y1, w, h), l=9, rt=1, colorR=color)
+                cv2.circle(img, (cx, cy), 5, color, cv2.FILLED)
+        
+        
 
         return img, player_positions
-
-    def calculate_velocity(self, player_positions, frame_diff=1):
-        """ Calculate player velocity based on change in position """
-        velocities = {}
-        for player_id, pos in player_positions.items():
-            if player_id in self.previous_player_positions:
-                prev_pos = self.previous_player_positions[player_id]
-                velocity = math.sqrt((pos[0] - prev_pos[0]) ** 2 + (pos[1] - prev_pos[1]) ** 2) / frame_diff
-                velocities[player_id] = velocity
-        return velocities
 
 
     def calculate_shuttlecock_velocity(self, previous_pos, current_pos, frame_diff=1):
@@ -142,6 +127,7 @@ class ObjectDetection():
         player_dir = (player_pos[0] - shuttlecock_pos[0], player_pos[1] - shuttlecock_pos[1])
         dot_product = player_dir[0] * shuttlecock_dir[0] + player_dir[1] * shuttlecock_dir[1]
         return dot_product > 0  # Positive means aligned with shuttlecock trajectory
+
 
     def predict_hit(self, player_positions, shuttlecock_pos, shuttlecock_velocity):
         """ Predict which player is most likely to hit the shuttlecock based on position and velocity """
@@ -160,11 +146,11 @@ class ObjectDetection():
     def track_shuttlecock(self, img_scaler):
         # Initialise variable to track previous closest player ID
         previous_closest_player_id = None
-        
+
         # Implement shuttlecock tracking using TrackNet
         frame_list = generate_frames(self.capture_path)
         dataset = Shuttlecock_Trajectory_Dataset(
-            seq_len=self.tracknet_seq_len, sliding_step=1, data_mode='heatmap', 
+            seq_len=self.tracknet_seq_len, sliding_step=1, data_mode='heatmap',
             bg_mode=self.bg_mode, frame_arr=np.array(frame_list)[:, :, :, ::-1]
         )
         data_loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=1, drop_last=False)
@@ -183,6 +169,14 @@ class ObjectDetection():
         tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
 
         skipped_frames = self.tracknet_seq_len - 1
+
+        # Track previous positions and distances for velocity and distance tracking
+        previous_player_positions = {}
+        total_distances = {1: 0, 2: 0, 3: 0, 4: 0}  # Track total distance for each player
+        player_speeds = {1: 0, 2: 0, 3: 0, 4: 0}  # Track velocity for each player
+
+        # Initialize a deque to store player velocities for smoothing
+        velocity_history = {1: deque(maxlen=5), 2: deque(maxlen=5), 3: deque(maxlen=5), 4: deque(maxlen=5)}
 
         for step, (i, x) in enumerate(tqdm(data_loader)):
             x = x.float().cuda()
@@ -210,20 +204,37 @@ class ObjectDetection():
             if shuttlecock_pos:  # Only calculate if the shuttlecock position is available
                 min_dist = float('inf')
                 closest_player_id = None
-                
+
                 for player_id, player_pos in player_positions.items():
                     if player_id in [1, 2, 3, 4]:  # Assuming these are valid player IDs
                         print(f"Player ID: {player_id}, Position: {player_pos}")
+
                         # Calculate Euclidean distance between player and shuttlecock
                         distance = math.sqrt((player_pos[0] - shuttlecock_pos[0]) ** 2 + (player_pos[1] - shuttlecock_pos[1]) ** 2)
                         if distance < min_dist:
                             min_dist = distance
                             closest_player_id = player_id
 
+                        # Calculate the total distance moved by the player
+                        if player_id in previous_player_positions:
+                            prev_pos = previous_player_positions[player_id]
+                            frame_distance = math.sqrt((player_pos[0] - prev_pos[0]) ** 2 + (player_pos[1] - prev_pos[1]) ** 2)
+                            total_distances[player_id] += frame_distance / self.scale_factor  # Convert to meters
+
+                            # Calculate the velocity and add to history
+                            player_velocity = (frame_distance * vid_fps) / self.scale_factor  # Convert to meters
+                            velocity_history[player_id].append(player_velocity)  # Store the velocity in history
+
+                            # Compute the average velocity from history for smoothing
+                            if velocity_history[player_id]:
+                                player_speeds[player_id] = sum(velocity_history[player_id]) / len(velocity_history[player_id])
+
+                        # Update previous position
+                        previous_player_positions[player_id] = player_pos
+
                 # Print or store the closest player
                 if closest_player_id is not None:
                     print(f"Player {closest_player_id} is closest to the shuttlecock at frame {frame}")
-                    # for drawing the black bounding box later
                     self.current_closest = closest_player_id
 
                     # Change the color of the current closest player to black
@@ -233,13 +244,39 @@ class ObjectDetection():
                     # Revert the previous closest player to their original color
                     if previous_closest_player_id is not None and previous_closest_player_id != closest_player_id:
                         if previous_closest_player_id in self.player_colors:
-                            self.player_colors[previous_closest_player_id] = self.color_list[previous_closest_player_id]
+                            self.player_colors[previous_closest_player_id] = self.default_color
 
                     # Update the previous closest player ID
                     previous_closest_player_id = closest_player_id
 
             # Draw the shuttlecock trajectory on the image
             img = draw_traj(img, traj, radius=3, color='red')
+
+            # Display the player stats (velocity and total distance moved)
+            for player_id in [1, 2, 3, 4]:
+                speed_text = f"Player {player_id} Speed: {player_speeds[player_id]:.2f} m/s"  # Changed to m/s
+                distance_text = f"Player {player_id} Distance: {total_distances[player_id]:.2f} m"  # Changed to m
+                print(speed_text)
+                print(distance_text)
+
+                # Get the width of the image
+                img_height, img_width = img.shape[:2]
+
+                # Set a margin from the right side
+                margin = 20
+
+                # Calculate the positions for the top-right placement
+                text_position_x = img_width - margin
+                text_position_y_speed = 30 + player_id * 30  # Adjust for speed
+                text_position_y_distance = 50 + player_id * 30  # Adjust for distance
+
+                # Put the speed text at the top right
+                cv2.putText(img, speed_text, (text_position_x - len(speed_text) * 10, text_position_y_speed),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+                # Put the distance text below the speed text at the top right
+                cv2.putText(img, distance_text, (text_position_x - len(distance_text) * 10, text_position_y_distance),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
             # Write the frame to the video file
             out.write(img)
@@ -248,6 +285,8 @@ class ObjectDetection():
         out.release()
 
         return result_path
+
+
 
 
     def __call__(self):
@@ -272,39 +311,7 @@ class ObjectDetection():
         result_path = self.track_shuttlecock(img_scaler)
         print(f"Result video saved at {result_path}")
 
-        # Video processing loop
-        # frame_count = 0
-        # while True:
-        #     ret, img = self.capture.read()
-        #     if not ret:
-        #         break  # End of the video
-
-        #     # Player detection for the current frame
-        #     detections = np.empty((0, 5))
-        #     results = self.predict(img)
-        #     detections, img = self.plot_boxes(results, img, detections)
-
-        #     # Track players using SORT tracker
-        #     img, player_positions = self.track_detect(detections, tracker, img)
-
-        #     # Check if we have a previous shuttlecock position to calculate velocity
-        #     if self.previous_shuttlecock_pos:
-        #         shuttlecock_velocity = self.calculate_shuttlecock_velocity(self.previous_shuttlecock_pos, shuttlecock_pos)
-
-        #         # Predict which player is most likely to hit the shuttlecock
-        #         closest_player_id = self.predict_hit(player_positions, shuttlecock_pos, shuttlecock_velocity)
-
-        #         if closest_player_id is not None:
-        #             print(f"Player {closest_player_id} is most likely to hit the shuttlecock.")
-
-
-        #     # Update the previous player positions and shuttlecock position for the next frame 
-        #     # self.previous_player_positions = player_positions
-        #     # self.previous_shuttlecock_pos = shuttlecock_pos
-
-        #     frame_count += 1
-
-        # self.capture.release()
+        
         print("Tracking finished.")
 
         return result_path
