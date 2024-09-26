@@ -120,8 +120,6 @@ class ObjectDetection():
 
         return img, player_positions
 
-
-
     def calculate_velocity(self, player_positions, frame_diff=1):
         """ Calculate player velocity based on change in position """
         velocities = {}
@@ -138,14 +136,12 @@ class ObjectDetection():
         velocity = math.sqrt((current_pos[0] - previous_pos[0]) ** 2 + (current_pos[1] - previous_pos[1]) ** 2) / frame_diff
         return velocity
 
-
     def is_moving_toward_shuttlecock(self, player_pos, shuttlecock_pos, shuttlecock_prev_pos):
         """ Check if the player is moving toward the shuttlecock based on trajectory """
         shuttlecock_dir = (shuttlecock_pos[0] - shuttlecock_prev_pos[0], shuttlecock_pos[1] - shuttlecock_prev_pos[1])
         player_dir = (player_pos[0] - shuttlecock_pos[0], player_pos[1] - shuttlecock_pos[1])
         dot_product = player_dir[0] * shuttlecock_dir[0] + player_dir[1] * shuttlecock_dir[1]
         return dot_product > 0  # Positive means aligned with shuttlecock trajectory
-
 
     def predict_hit(self, player_positions, shuttlecock_pos, shuttlecock_velocity):
         """ Predict which player is most likely to hit the shuttlecock based on position and velocity """
@@ -160,7 +156,6 @@ class ObjectDetection():
                     min_dist = distance
                     closest_player_id = player_id
         return closest_player_id
-
 
     def track_shuttlecock(self, img_scaler):
         # Initialise variable to track previous closest player ID
@@ -252,15 +247,7 @@ class ObjectDetection():
         # Release the video writer
         out.release()
 
-        return result_path, shuttlecock_pos
-
-
-
-
-
-
-
-
+        return result_path
 
 
     def __call__(self):
@@ -286,48 +273,45 @@ class ObjectDetection():
         print(f"Result video saved at {result_path}")
 
         # Video processing loop
-        frame_count = 0
-        while True:
-            ret, img = self.capture.read()
-            if not ret:
-                break  # End of the video
+        # frame_count = 0
+        # while True:
+        #     ret, img = self.capture.read()
+        #     if not ret:
+        #         break  # End of the video
 
-            # Player detection for the current frame
-            detections = np.empty((0, 5))
-            results = self.predict(img)
-            detections, img = self.plot_boxes(results, img, detections)
+        #     # Player detection for the current frame
+        #     detections = np.empty((0, 5))
+        #     results = self.predict(img)
+        #     detections, img = self.plot_boxes(results, img, detections)
 
-            # Track players using SORT tracker
-            img, player_positions = self.track_detect(detections, tracker, img)
+        #     # Track players using SORT tracker
+        #     img, player_positions = self.track_detect(detections, tracker, img)
 
-            # Check if we have a previous shuttlecock position to calculate velocity
-            if self.previous_shuttlecock_pos:
-                shuttlecock_velocity = self.calculate_shuttlecock_velocity(self.previous_shuttlecock_pos, shuttlecock_pos)
+        #     # Check if we have a previous shuttlecock position to calculate velocity
+        #     if self.previous_shuttlecock_pos:
+        #         shuttlecock_velocity = self.calculate_shuttlecock_velocity(self.previous_shuttlecock_pos, shuttlecock_pos)
 
-                # Predict which player is most likely to hit the shuttlecock
-                closest_player_id = self.predict_hit(player_positions, shuttlecock_pos, shuttlecock_velocity)
+        #         # Predict which player is most likely to hit the shuttlecock
+        #         closest_player_id = self.predict_hit(player_positions, shuttlecock_pos, shuttlecock_velocity)
 
-                if closest_player_id is not None:
-                    print(f"Player {closest_player_id} is most likely to hit the shuttlecock.")
+        #         if closest_player_id is not None:
+        #             print(f"Player {closest_player_id} is most likely to hit the shuttlecock.")
 
 
-            # Update the previous player positions and shuttlecock position for the next frame 
-            # self.previous_player_positions = player_positions
-            # self.previous_shuttlecock_pos = shuttlecock_pos
+        #     # Update the previous player positions and shuttlecock position for the next frame 
+        #     # self.previous_player_positions = player_positions
+        #     # self.previous_shuttlecock_pos = shuttlecock_pos
 
-            frame_count += 1
+        #     frame_count += 1
 
-        self.capture.release()
+        # self.capture.release()
         print("Tracking finished.")
 
-
-
-
-
+        return result_path
 
 # Example usage
-detector = ObjectDetection(capture="test.mp4", result='result', court=(450, 390, 1500, 1000), tracknet_file='ckpts/TrackNet_best.pt')
-detector()
+# detector = ObjectDetection(capture="test.mp4", result='result', court=(450, 390, 1500, 1000), tracknet_file='ckpts/TrackNet_best.pt')
+# detector()
 
 
 

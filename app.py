@@ -36,7 +36,7 @@ def upload_file():
             return jsonify({'error': 'Error processing video'}), 500
 
         # Return the correct URL for the video
-        video_url = url_for('static', filename=f'results/{os.path.basename(result_path)}')
+        video_url = url_for('static', filename=os.path.join('results', os.path.basename(result_path)))
         print(f"Video URL: {video_url}")  # Debugging statement
         return jsonify({'video_url': video_url})
 

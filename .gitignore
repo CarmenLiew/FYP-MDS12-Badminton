@@ -3,6 +3,7 @@ test/
 ckpts/
 figure/
 myenv/
+newenv/
 __pycache__/
 utils/__pycache__/
 prediction/
