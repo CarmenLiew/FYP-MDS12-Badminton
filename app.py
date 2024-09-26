@@ -1,5 +1,6 @@
 from flask import Flask, request, render_template, jsonify, url_for
 import os
+import ffmpeg
 from integration import ObjectDetection  # Import your ObjectDetection class
 
 app = Flask(__name__)
@@ -35,8 +36,15 @@ def upload_file():
         if result_path is None:
             return jsonify({'error': 'Error processing video'}), 500
 
-        # Return the correct URL for the video
-        video_url = url_for('static', filename=os.path.join('results', os.path.basename(result_path)))
+        # Convert the AVI result to MP4 using ffmpeg
+        mp4_result_path = os.path.splitext(result_path)[0] + ".mp4"
+        try:
+            ffmpeg.input(result_path).output(mp4_result_path).run()
+        except Exception as e:
+            return jsonify({'error': f'Video conversion failed: {str(e)}'}), 500
+
+        # Return the correct URL for the video in MP4 format
+        video_url = url_for('static', filename=f'results/{os.path.basename(mp4_result_path)}')
         print(f"Video URL: {video_url}")  # Debugging statement
         return jsonify({'video_url': video_url})
 
