@@ -19,7 +19,7 @@ from collections import deque
 
 
 class ObjectDetection():
-    def __init__(self, capture, result, court, tracknet_file, scale_factor=59.7):
+    def __init__(self, capture, result, court, tracknet_file, scale_factor=59.7, progress_callback=None):
         self.capture_path = capture  # Store the path to the video file
         self.result = result
         self.court = court  # court coordinates (xmin, ymin, xmax, ymax)
@@ -28,6 +28,7 @@ class ObjectDetection():
         self.player_colors = {}  # dictionary to store all colours for the players
         self.previous_player_positions = {}  # Store player positions for velocity calculation
         self.previous_shuttlecock_pos = None  # Track previous shuttlecock position
+        self.progress_callback = progress_callback # Add progress callback
 
         # Load TrackNet model for shuttlecock tracking
         tracknet_ckpt = torch.load(tracknet_file)
@@ -91,8 +92,6 @@ class ObjectDetection():
             w, h = x2 - x1, y2 - y1
             cx, cy = x1 + w // 2, y1 + h // 2  # Center of player
 
-            
-
             # Assign predefined colors to players based on their ID
 
             # Assign a color to the player ID
@@ -111,10 +110,7 @@ class ObjectDetection():
                 cvzone.cornerRect(img, (x1, y1, w, h), l=9, rt=1, colorR=color)
                 cv2.circle(img, (cx, cy), 5, color, cv2.FILLED)
         
-        
-
         return img, player_positions
-
 
     def calculate_shuttlecock_velocity(self, previous_pos, current_pos, frame_diff=1):
         """ Calculate shuttlecock velocity """
@@ -127,7 +123,6 @@ class ObjectDetection():
         player_dir = (player_pos[0] - shuttlecock_pos[0], player_pos[1] - shuttlecock_pos[1])
         dot_product = player_dir[0] * shuttlecock_dir[0] + player_dir[1] * shuttlecock_dir[1]
         return dot_product > 0  # Positive means aligned with shuttlecock trajectory
-
 
     def predict_hit(self, player_positions, shuttlecock_pos, shuttlecock_velocity):
         """ Predict which player is most likely to hit the shuttlecock based on position and velocity """
@@ -178,6 +173,7 @@ class ObjectDetection():
         # Initialize a deque to store player velocities for smoothing
         velocity_history = {1: deque(maxlen=5), 2: deque(maxlen=5), 3: deque(maxlen=5), 4: deque(maxlen=5)}
 
+        total_frames = len(data_loader)
         for step, (i, x) in enumerate(tqdm(data_loader)):
             x = x.float().cuda()
             with torch.no_grad():
@@ -281,13 +277,15 @@ class ObjectDetection():
             # Write the frame to the video file
             out.write(img)
 
+            # Update progress
+            if self.progress_callback:
+                progress = int((step + 1) / total_frames * 100)
+                self.progress_callback(progress)
+
         # Release the video writer
         out.release()
 
         return result_path
-
-
-
 
     def __call__(self):
         self.capture = cv2.VideoCapture(self.capture_path)  # Initialize the video capture

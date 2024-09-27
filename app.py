@@ -1,13 +1,33 @@
 from flask import Flask, request, render_template, jsonify, url_for
+from flask_socketio import SocketIO, emit
 import os
 import ffmpeg
 from integration import ObjectDetection  # Import your ObjectDetection class
+import threading
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'secret!'
+socketio = SocketIO(app)
+
 UPLOAD_FOLDER = 'uploads'
 RESULT_FOLDER = 'static/results'  # Ensure results are served from a static folder
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
+
+def run_object_detection(filepath, result_folder, court, tracknet_file):
+    def progress_callback(progress):
+        print(f'Progress: {progress}%')  # Debugging statement
+        socketio.emit('progress', {'progress': progress})
+
+    detector = ObjectDetection(
+        capture=filepath, 
+        result=result_folder, 
+        court=court, 
+        tracknet_file=tracknet_file,
+        progress_callback=progress_callback
+    )
+    result_path = detector()
+    return result_path
 
 @app.route('/')
 def index():
@@ -25,13 +45,12 @@ def upload_file():
         file.save(filepath)
 
         # Run the object detection
-        detector = ObjectDetection(
-            capture=filepath, 
-            result=RESULT_FOLDER, 
+        result_path = run_object_detection(
+            filepath, 
+            RESULT_FOLDER, 
             court=(450, 390, 1500, 1000), 
             tracknet_file='ckpts/TrackNet_best.pt'
         )
-        result_path = detector()
 
         if result_path is None:
             return jsonify({'error': 'Error processing video'}), 500
@@ -49,4 +68,4 @@ def upload_file():
         return jsonify({'video_url': video_url})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    socketio.run(app, debug=True)

@@ -5,7 +5,7 @@
 
 Code to install all libraries in terminal
 ```
-pip install ultralytics opencv-python cvzone numpy parse filterpy ffmpeg-python
+pip install ultralytics opencv-python cvzone numpy parse filterpy ffmpeg-python flask-socketio
 ```
 
 Created by MDS12
