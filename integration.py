@@ -250,8 +250,9 @@ class ObjectDetection():
 
             # Display the player stats (velocity and total distance moved)
             for player_id in [1, 2, 3, 4]:
-                speed_text = f"Player {player_id} Speed: {player_speeds[player_id]:.2f} m/s"  # Changed to m/s
-                distance_text = f"Player {player_id} Distance: {total_distances[player_id]:.2f} m"  # Changed to m
+                player_text = f"Player {player_id}"
+                speed_text = f"Speed: {player_speeds[player_id]:.2f} m/s"  # Changed to m/s
+                distance_text = f"Distance: {total_distances[player_id]:.2f} m"  # Changed to m
                 print(speed_text)
                 print(distance_text)
 
@@ -266,13 +267,29 @@ class ObjectDetection():
                 text_position_y_speed = 30 + player_id * 30  # Adjust for speed
                 text_position_y_distance = 50 + player_id * 30  # Adjust for distance
 
-                # Put the speed text at the top right
-                cv2.putText(img, speed_text, (text_position_x - len(speed_text) * 10, text_position_y_speed),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-                # Put the distance text below the speed text at the top right
-                cv2.putText(img, distance_text, (text_position_x - len(distance_text) * 10, text_position_y_distance),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                # Combine speed and distance into one string
+                combined_text = f"{player_text} {speed_text} | {distance_text}"
+
+                # Set font parameters
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.6
+                font_thickness = 2
+
+
+                # Get text size (width, height) and the baseline
+                (text_width, text_height), baseline = cv2.getTextSize(combined_text, font, font_scale, font_thickness)
+
+                # # Define the top-left and bottom-right coordinates for the rectangle
+                top_left = (text_position_x - text_width - 20, text_position_y_speed - text_height - 10)  # Add padding to fit the text
+                bottom_right = (text_position_x + 20, text_position_y_speed + 10)
+
+                # # Draw a filled black rectangle for the background to see the text better
+                cv2.rectangle(img, top_left, bottom_right, (0, 0, 0), -1)
+
+                # Put the combined text at the top right
+                cv2.putText(img, combined_text, (text_position_x - len(combined_text) * 10, text_position_y_speed),
+                font, 0.6, (255, 255, 255), 2)
 
             # Write the frame to the video file
             out.write(img)
