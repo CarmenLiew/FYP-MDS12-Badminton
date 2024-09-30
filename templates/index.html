@@ -169,9 +169,18 @@
         }
 
         function displayVideo(videoUrl) {
+            outputVideo.style.display = 'none';  // Hide video initially
             outputVideo.src = videoUrl;
-            outputVideo.style.display = 'block';
-            outputVideo.play();
+
+            // Show the loading indicator while the video is being loaded
+            loading.style.display = 'block';
+
+            // When the video is ready, hide the loading indicator and show the video
+            outputVideo.addEventListener('loadeddata', () => {
+                loading.style.display = 'none';  // Hide loading text when video is ready
+                outputVideo.style.display = 'block';  // Show the video
+                outputVideo.play();  // auto-play the video when ready
+            });
         }
 
         // Initialize Socket.IO
