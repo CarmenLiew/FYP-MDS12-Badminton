@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processed Video Result</title>
+    <style>
+        header {
+            background-color: #645d53;
+            padding: 30px;
+            color: rgb(255, 255, 255);
+            text-align: center;
+        }
+        #main-container {
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            margin: 0 auto;
+        }
+        video {
+            display: block; /* Ensure it behaves as a block element */
+            margin: 0 auto; /* Center the video */
+            max-width: 100%; /* Responsive video */
+            height: auto; /* Maintain aspect ratio */
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Badminton Match Insights: Player Predictions and Shuttlecock Tracking</h1>
+    </header>
+    <br><br>
+    <div id="main-container">
+        <video src="{{ video_url }}" controls width="80%"></video>
+    </div>
+</body>
+</html>

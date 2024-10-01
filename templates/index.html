@@ -3,24 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <title>Player and Shuttlecock Tracker</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        header {
+            background-color: #645d53;
+            padding: 30px;
+            color: rgb(255, 255, 255);
             text-align: center;
+        }
+        h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+        h2 {
+            font-size: 24px;
+            color: #333;
+        }
+        #main-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            text-align: center;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
         }
         #drop-area {
-            border: 2px dashed #007BFF;
+            border: 2px dashed #645d53;
             border-radius: 20px;
-            width: 80%;
-            margin: 0 auto;
-            padding: 20px;
+            padding: 30px;
             text-align: center;
-            transition: background-color 0.3s;
+            transition: background-color 0.3s ease;
+            margin-bottom: 20px;
+            background-color: #fafafa;
+            position: relative;
         }
-        #drop-area.hover {
-            background-color: #f0f8ff;
+        #drop-area:hover {
+            background-color: #eaeaea;
+        }
+        #drop-area i {
+            color: #645d53;
+        }
+        #fileLabel {
+            display: inline-block;
+            background-color: #645d53;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            text-decoration: none;
+        }
+        #fileLabel:hover {
+            background-color: #5a4a3e;
+        }
+        p {
+            color: #777;
+            margin: 5px 0;
+        }
+        h3 {
+            margin: 10px 0;
+            color: #333;
         }
         #loading {
             display: none;
@@ -47,26 +100,33 @@
             border-radius: 5px;
         }
         video {
+            display: none; /* Initially hidden */
+            width: 100%; /* Full width for video */
             margin-top: 20px;
-            max-width: 100%;
-            border: 1px solid #ccc;
         }
     </style>
 </head>
 <body>
-    <h1>Upload Badminton Video Matches</h1>
-    <div id="drop-area">
-        <p>Drag & Drop your video file here or click to upload</p>
-        <input type="file" id="fileElem" accept="video/*" style="display:none;">
-        <label for="fileElem" id="fileLabel" style="cursor:pointer;">Browse Files</label>
+    <header>
+        <h1>Integrated Tracking System for Player and Shuttlecock in Badminton Matches</h1>
+    </header>
+    <br><br>
+    <div id="main-container">
+        <div id="drop-area">
+            <i class="fa fa-upload" style="font-size: 40px;"></i>
+            <h2>Upload Your Video File Here</h2>
+            <p>Supported Format: MP4</p>
+            <h3>OR</h3>
+            <input type="file" id="fileElem" accept="video/*" style="display:none;">
+            <label for="fileElem" id="fileLabel">Browse Files</label>
+        </div>
+        <div id="loading">Processing your video, please wait...</div>
+        <div id="progressContainer">
+            <div id="progressBar"></div>
+        </div>
+        <div id="status"></div>
+        <video id="outputVideo" controls></video> 
     </div>
-    <div id="loading">Processing your video, please wait...</div>
-    
-    <div id="progressContainer">
-        <div id="progressBar"></div>
-    </div>
-    <div id="status"></div>
-    <video id="outputVideo" controls style="display:none;"></video>
 
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <script>
@@ -76,7 +136,6 @@
         const status = document.getElementById('status');
         const progressContainer = document.getElementById('progressContainer');
         const progressBar = document.getElementById('progressBar');
-        const outputVideo = document.getElementById('outputVideo');
 
         // Prevent default drag behaviors
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -151,7 +210,7 @@
                     loading.style.display = 'none';
                     progressContainer.style.display = 'none';
                     status.innerText = 'Processing complete! Please wait for the video to be displayed';
-                    displayVideo(videoUrl);
+                    redirectToResultPage(videoUrl);
                 } else {
                     loading.style.display = 'none';
                     progressContainer.style.display = 'none';
@@ -168,19 +227,9 @@
             xhr.send(formData);
         }
 
-        function displayVideo(videoUrl) {
-            outputVideo.style.display = 'none';  // Hide video initially
-            outputVideo.src = videoUrl;
-
-            // Show the loading indicator while the video is being loaded
-            loading.style.display = 'block';
-
-            // When the video is ready, hide the loading indicator and show the video
-            outputVideo.addEventListener('loadeddata', () => {
-                loading.style.display = 'none';  // Hide loading text when video is ready
-                outputVideo.style.display = 'block';  // Show the video
-                outputVideo.play();  // auto-play the video when ready
-            });
+        function redirectToResultPage(videoUrl) {
+            // Redirect to a new page with the video URL
+            window.location.href = `/result?video_url=${encodeURIComponent(videoUrl)}`;
         }
 
         // Initialize Socket.IO

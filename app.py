@@ -67,5 +67,10 @@ def upload_file():
         print(f"Video URL: {video_url}")  # Debugging statement
         return jsonify({'video_url': video_url})
 
+@app.route('/result')
+def result():
+    video_url = request.args.get('video_url')
+    return render_template('result.html', video_url=video_url)
+
 if __name__ == '__main__':
     socketio.run(app, debug=True)
