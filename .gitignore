@@ -3,6 +3,7 @@ test/
 ckpts/
 figure/
 myenv/
+.venv/
 newenv/
 __pycache__/
 utils/__pycache__/
