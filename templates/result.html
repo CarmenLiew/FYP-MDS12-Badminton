@@ -18,22 +18,34 @@
             color: rgb(255, 255, 255);
             text-align: center;
         }
-        #main-container {
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            margin: 0 auto;
-        }
+
+        #note-container {
+        text-align: center;
+        padding: 20px;
+        margin: 20px auto; 
+        font-size: 21px;
+        background-color: #ffffff; 
+        border: 1px solid #ccc;
+        border-radius: 8px; 
+        max-width: 77%; 
+    }
+        
         video {
-            display: block; /* Ensure it behaves as a block element */
-            margin: 0 auto; /* Center the video */
-            max-width: 100%; /* Responsive video */
-            height: auto; /* Maintain aspect ratio */
+            display: block;
+            margin: 0 auto;
+            max-width: 100%;
+            height: auto;
         }
+
         h1 {
-            font-size: 28px; /* Ensure the same font size */
-            font-weight: 700; /* Optional: make sure font weight is consistent */
+            font-size: 28px;
+            font-weight: 700;
             margin: 0;
-            line-height: 1.2; /* Ensure consistent spacing */
+            line-height: 1.2;
+        }
+
+        text {
+            font-size: 16px;
         }
 
     </style>
@@ -44,20 +56,18 @@
     </header>
     <br><br>
 
-    <div id="main-container" style="text-align: left; padding-left: 150px; padding-bottom: 10px; padding-top: 5px; font-size: 20px;">
-        <p>
-            Notes: <br>
-            1. When a player's bounding box changes from <b style="color: rgb(70, 145, 198);">blue</b> to <b>black</b>, it indicates that the player is predicted to be the next to hit the shuttlecock. <br>
+    <div id="note-container">
+        <u><strong>Notes</strong></u> <br><br>
+            <text>
+            1. When a player's bounding box changes from <b style="color: rgb(70, 145, 198);">blue</b> to <b>black</b>, it indicates that the player is <b>predicted</b> to be the next to hit the shuttlecock. <br>
             2. <b>Distance</b> refers to the total distance the player has covered up to that point.<br>
-
-        </p>
-    </div>
+            3. <b>Speed</b> refers to the speed of the player at the specific frame.<br>
+            </text>
+  </div>
+    <br>
 
     <div id="main-container">
         <video src="{{ video_url }}" controls width="80%"></video>
     </div>
-
-    
-    
 </body>
 </html>
