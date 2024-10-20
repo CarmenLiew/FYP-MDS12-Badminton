@@ -85,6 +85,11 @@
             font-size: 18px;
             color: green;
         }
+        #errorStatus{
+            margin-top: 20px;
+            font-size: 18px;
+            color: red;
+        }
         #progressContainer {
             display: none;
             width: 80%;
@@ -133,6 +138,7 @@
             <div id="progressBar"></div>
         </div>
         <div id="status"></div>
+        <div id="errorStatus"></div>
         <video id="outputVideo" controls></video> 
     </div>
 
@@ -222,7 +228,7 @@
                 } else {
                     loading.style.display = 'none';
                     progressContainer.style.display = 'none';
-                    status.innerText = 'Error processing video';
+                    errorStatus.innerText = 'Error processing video: only MP4 format is allowed';
                 }
             };
 

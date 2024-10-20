@@ -4,6 +4,7 @@ import os
 import ffmpeg
 from integration import ObjectDetection  # Import your ObjectDetection class
 import threading
+import shutil
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
@@ -41,6 +42,10 @@ def upload_file():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
     if file:
+        if os.path.exists(RESULT_FOLDER):
+            shutil.rmtree(RESULT_FOLDER)
+        os.makedirs(RESULT_FOLDER)
+
         filepath = os.path.join(UPLOAD_FOLDER, file.filename)
         file.save(filepath)
 
