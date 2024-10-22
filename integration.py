@@ -83,34 +83,49 @@ class ObjectDetection():
         return not (x2 < xmin or x1 > xmax or y2 < ymin or y1 > ymax)
 
     def track_detect(self, detections, tracker, img):
+        # Update the tracker with the current detections and retrieve the results
         resultTracker = tracker.update(detections)
-        player_positions = {}  # Store player ID and coordinates
+        
+        # Initialize a dictionary to store player ID and their corresponding center coordinates
+        player_positions = {}
 
+        # Iterate over the tracking results to process each detected player
         for res in resultTracker:
+            # Unpack the results into bounding box coordinates and player ID
             x1, y1, x2, y2, id = res
+            
+            # Convert the bounding box coordinates and ID to integers
             x1, y1, x2, y2, id = int(x1), int(y1), int(x2), int(y2), int(id)
+            
+            # Calculate the width and height of the bounding box
             w, h = x2 - x1, y2 - y1
+            
+            # Calculate the center coordinates (cx, cy) of the player based on the bounding box
             cx, cy = x1 + w // 2, y1 + h // 2  # Center of player
 
-            # Assign predefined colors to players based on their ID
-
-            # Assign a color to the player ID
-            if id <= 4:
-                if self.current_closest is not None and id == self.current_closest: # if the current box being drawn is the closest player's
-                    color = (0,0,0) # make the bounding box black
-                else: # else keep their original colour
+            # Assign a color to the player based on their ID
+            if id <= 4:  # Check if the player ID is within the expected range
+                # Check if the current player is the closest player to the shuttlecock
+                if self.current_closest is not None and id == self.current_closest:
+                    color = (0, 0, 0)  # Set the bounding box color to black for the closest player
+                else:
+                    # If not the closest, use the player's original color stored in player_colors
                     self.player_colors[id] = self.default_color
-                    color = self.player_colors[id]
+                    color = self.player_colors[id]  # Get the color for the player
 
-                # Save player center coordinates
+                # Save the player's center coordinates in the player_positions dictionary
                 player_positions[id] = (cx, cy)
 
-                # Draw the player box and ID
+                # Draw the player's ID as text on the image at the top-left corner of the bounding box
                 cvzone.putTextRect(img, f'Player: {id}', (x1, y1), scale=1, thickness=1, colorR=color)
+                # Draw a rectangle around the player's bounding box with rounded corners
                 cvzone.cornerRect(img, (x1, y1, w, h), l=9, rt=1, colorR=color)
+                # Draw a filled circle at the center of the player for visual reference
                 cv2.circle(img, (cx, cy), 5, color, cv2.FILLED)
-        
+
+        # Return the annotated image and the dictionary of player positions
         return img, player_positions
+
 
     def calculate_shuttlecock_velocity(self, previous_pos, current_pos, frame_diff=1):
         """ Calculate shuttlecock velocity """
