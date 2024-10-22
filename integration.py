@@ -143,63 +143,69 @@ class ObjectDetection():
         previous_closest_player_id = None
 
         # Implement shuttlecock tracking using TrackNet
+        # Generate a list of frames from the video capture path
         frame_list = generate_frames(self.capture_path)
+        
+        # Create a dataset for shuttlecock trajectory using the frames generated
         dataset = Shuttlecock_Trajectory_Dataset(
             seq_len=self.tracknet_seq_len, sliding_step=1, data_mode='heatmap',
-            bg_mode=self.bg_mode, frame_arr=np.array(frame_list)[:, :, :, ::-1]
+            bg_mode=self.bg_mode, frame_arr=np.array(frame_list)[:, :, :, ::-1]  # Convert BGR to RGB
         )
+        
+        # Create a DataLoader for batching and shuffling the dataset
         data_loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=1, drop_last=False)
 
-        traj = deque(maxlen=8)  # Adjust maxlen to control the length of the trajectory
+        traj = deque(maxlen=8)  # Initialize trajectory buffer with a maximum length of 8
         shuttlecock_pos = None  # Initialize the shuttlecock position to None
 
-        # Set up video writer
+        # Set up video writer for saving output video with tracked movements
         result_path = os.path.join(self.result, 'results.avi')
         codec = cv2.VideoWriter_fourcc(*'XVID')
-        vid_fps = int(self.capture.get(cv2.CAP_PROP_FPS))
-        vid_width = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        vid_height = int(self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        out = cv2.VideoWriter(result_path, codec, vid_fps, (vid_width, vid_height))
+        vid_fps = int(self.capture.get(cv2.CAP_PROP_FPS))  # Get video frame rate
+        vid_width = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH))  # Get video width
+        vid_height = int(self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT))  # Get video height
+        out = cv2.VideoWriter(result_path, codec, vid_fps, (vid_width, vid_height))  # Create video writer object
 
+        # Initialize SORT tracker for tracking players
         tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
 
-        skipped_frames = self.tracknet_seq_len - 1
+        skipped_frames = self.tracknet_seq_len - 1  # Determine how many frames to skip for accurate tracking
 
         # Track previous positions and distances for velocity and distance tracking
         previous_player_positions = {}
-        total_distances = {1: 0, 2: 0, 3: 0, 4: 0}  # Track total distance for each player
-        player_speeds = {1: 0, 2: 0, 3: 0, 4: 0}  # Track velocity for each player
+        total_distances = {1: 0, 2: 0, 3: 0, 4: 0}  # Dictionary to track total distance for each player
+        player_speeds = {1: 0, 2: 0, 3: 0, 4: 0}  # Dictionary to track velocity for each player
 
-        # Initialize a deque to store player velocities for smoothing
+        # Initialize a deque to store player velocities for smoothing calculations
         velocity_history = {1: deque(maxlen=5), 2: deque(maxlen=5), 3: deque(maxlen=5), 4: deque(maxlen=5)}
 
-        total_frames = len(data_loader)
-        for step, (i, x) in enumerate(tqdm(data_loader)):
-            x = x.float().cuda()
-            with torch.no_grad():
-                y_pred = self.tracknet(x).detach().cpu()
+        total_frames = len(data_loader)  # Get the total number of frames in the data loader
+        for step, (i, x) in enumerate(tqdm(data_loader)):  # Iterate over each frame in the data loader
+            x = x.float().cuda()  # Convert the input tensor to float and move to GPU
+            with torch.no_grad():  # Disable gradient tracking for inference
+                y_pred = self.tracknet(x).detach().cpu()  # Get predictions from TrackNet
 
-            # Predict shuttlecock location
+            # Predict shuttlecock location based on model predictions
             pred_dict = predict(i, y_pred=y_pred, img_scaler=img_scaler)
             for frame, x, y, vis in zip(pred_dict['Frame'], pred_dict['X'], pred_dict['Y'], pred_dict['Visibility']):
-                actual_frame_index = frame + skipped_frames
+                actual_frame_index = frame + skipped_frames  # Adjust frame index considering skipped frames
                 if vis:  # Only process visible shuttlecock locations
-                    traj.append((x, y))
-                    shuttlecock_pos = (x, y)
+                    traj.append((x, y))  # Append the current shuttlecock position to the trajectory
+                    shuttlecock_pos = (x, y)  # Update the current position of the shuttlecock
                     # Print the coordinates for debugging
                     print(f"Frame: {frame}, X: {x}, Y: {y}")
 
             # Player detection for the current frame
-            img = frame_list[step + skipped_frames]
-            detections = np.empty((0, 5))
-            results = self.predict(img)
-            detections, img = self.plot_boxes(results, img, detections)
-            img, player_positions = self.track_detect(detections, tracker, img)
+            img = frame_list[step + skipped_frames]  # Get the current frame image
+            detections = np.empty((0, 5))  # Initialize empty detections array
+            results = self.predict(img)  # Get detection results for the current frame
+            detections, img = self.plot_boxes(results, img, detections)  # Plot detected boxes on the image
+            img, player_positions = self.track_detect(detections, tracker, img)  # Track detected players in the image
 
-            # Compute distances between players and shuttlecock
+            # Compute distances between players and the shuttlecock
             if shuttlecock_pos:  # Only calculate if the shuttlecock position is available
-                min_dist = float('inf')
-                closest_player_id = None
+                min_dist = float('inf')  # Initialize minimum distance to infinity
+                closest_player_id = None  # Variable to track the closest player ID
 
                 for player_id, player_pos in player_positions.items():
                     if player_id in [1, 2, 3, 4]:  # Assuming these are valid player IDs
@@ -207,12 +213,12 @@ class ObjectDetection():
 
                         # Calculate Euclidean distance between player and shuttlecock
                         distance = math.sqrt((player_pos[0] - shuttlecock_pos[0]) ** 2 + (player_pos[1] - shuttlecock_pos[1]) ** 2)
-                        if distance < min_dist:
+                        if distance < min_dist:  # Update if this player is closer than the previous closest
                             min_dist = distance
                             closest_player_id = player_id
 
                         # Calculate the total distance moved by the player
-                        if player_id in previous_player_positions:
+                        if player_id in previous_player_positions:  # Check if we have a previous position to compare
                             prev_pos = previous_player_positions[player_id]
                             frame_distance = math.sqrt((player_pos[0] - prev_pos[0]) ** 2 + (player_pos[1] - prev_pos[1]) ** 2)
                             total_distances[player_id] += frame_distance / self.scale_factor  # Convert to meters
@@ -225,84 +231,86 @@ class ObjectDetection():
                             if velocity_history[player_id]:
                                 player_speeds[player_id] = sum(velocity_history[player_id]) / len(velocity_history[player_id])
 
-                        # Update previous position
+                        # Update previous position for the player
                         previous_player_positions[player_id] = player_pos
 
                 # Print or store the closest player
                 if closest_player_id is not None:
                     print(f"Player {closest_player_id} is closest to the shuttlecock at frame {frame}")
-                    self.current_closest = closest_player_id
+                    self.current_closest = closest_player_id  # Update the current closest player
 
-                    # Change the color of the current closest player to black
+                    # Change the color of the current closest player to black for highlighting
                     if closest_player_id in self.player_colors:
                         self.player_colors[closest_player_id] = (0, 0, 0)  # Set to black
 
                     # Revert the previous closest player to their original color
                     if previous_closest_player_id is not None and previous_closest_player_id != closest_player_id:
                         if previous_closest_player_id in self.player_colors:
-                            self.player_colors[previous_closest_player_id] = self.default_color
+                            self.player_colors[previous_closest_player_id] = self.default_color  # Restore original color
 
                     # Update the previous closest player ID
                     previous_closest_player_id = closest_player_id
 
             # Draw the shuttlecock trajectory on the image
-            img = draw_traj(img, traj, radius=3, color='red')
+            img = draw_traj(img, traj, radius=3, color='red')  # Draw the trajectory in red
 
             # Display the player stats (velocity and total distance moved)
             for player_id in [1, 2, 3, 4]:
                 player_text = f"Player {player_id}"
                 speed_text = f"Speed: {player_speeds[player_id]:.2f} m/s"  # Changed to m/s
                 distance_text = f"Distance: {total_distances[player_id]:.2f} m"  # Changed to m
-                print(speed_text)
-                print(distance_text)
+                print(speed_text)  # Print speed for debugging
+                print(distance_text)  # Print distance for debugging
 
                 # Get the width of the image
                 img_height, img_width = img.shape[:2]
 
-                # Set a margin from the right side
+                # Set a margin from the right side for text placement
                 margin = 20
 
-                # Calculate the positions for the top-right placement
+                # Calculate the positions for the top-right placement of text
                 text_position_x = img_width - margin
-                text_position_y_speed = 30 + player_id * 30  # Adjust for speed
-                text_position_y_distance = 50 + player_id * 30  # Adjust for distance
+                text_position_y_speed = 30 + player_id * 30  # Adjust for speed text placement
+                text_position_y_distance = 50 + player_id * 30  # Adjust for distance text placement
 
-
-                # Combine speed and distance into one string
+                # Combine speed and distance into one string for display
                 combined_text = f"{player_text} {speed_text} | {distance_text}"
 
-                # Set font parameters
+                # Set font parameters for drawing text
                 font = cv2.FONT_HERSHEY_SIMPLEX
                 font_scale = 0.6
                 font_thickness = 2
 
-
-                # Get text size (width, height) and the baseline
+                # Get text size (width, height) and the baseline for proper placement
                 (text_width, text_height), baseline = cv2.getTextSize(combined_text, font, font_scale, font_thickness)
 
-                # # Define the top-left and bottom-right coordinates for the rectangle
+                # Define the top-left and bottom-right coordinates for the rectangle background of the text
                 top_left = (text_position_x - text_width - 20, text_position_y_speed - text_height - 10)  # Add padding to fit the text
                 bottom_right = (text_position_x + 20, text_position_y_speed + 10)
 
-                # # Draw a filled black rectangle for the background to see the text better
-                cv2.rectangle(img, top_left, bottom_right, (0, 0, 0), -1)
+                # Draw a filled black rectangle for the background to improve text visibility
+                cv2.rectangle(img, top_left, bottom_right, (0, 0, 0), thickness=cv2.FILLED)
 
-                # Put the combined text at the top right
-                cv2.putText(img, combined_text, (text_position_x - len(combined_text) * 10, text_position_y_speed),
-                font, 0.6, (255, 255, 255), 2)
+                # Draw the text on the image
+                cv2.putText(img, combined_text, (text_position_x - text_width, text_position_y_speed), font, font_scale, (255, 255, 255), font_thickness)
 
-            # Write the frame to the video file
+            # Write the frame with annotations to the output video
             out.write(img)
 
             # Update progress
             if self.progress_callback:
+                # Calculate the progress percentage based on the current step and total number of frames
                 progress = int((step + 1) / total_frames * 100)
+                
+                # Invoke the progress callback function to notify about the current progress
                 self.progress_callback(progress)
 
-        # Release the video writer
-        out.release()
+            # Release the video writer
+            out.release()  # Ensure the video writer is properly closed to finalize the output file
 
-        return result_path
+            # Return the path to the resulting video file
+            return result_path  # Return the path where the processed video is saved
+
 
     def __call__(self):
         self.capture = cv2.VideoCapture(self.capture_path)  # Initialize the video capture

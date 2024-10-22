@@ -16,19 +16,43 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 def run_object_detection(filepath, result_folder, court, tracknet_file):
-    def progress_callback(progress):
-        print(f'Progress: {progress}%')  # Debugging statement
-        socketio.emit('progress', {'progress': progress})
+    """
+    Run object detection on the specified video file and save the results.
 
+    Args:
+        filepath (str): The path to the input video file for object detection.
+        result_folder (str): The folder where the results will be saved.
+        court (str): The type of court (e.g., badminton court) used in the detection.
+        tracknet_file (str): The path to the TrackNet model file for shuttlecock tracking.
+
+    Returns:
+        str: The path to the result video file after processing.
+    """
+    
+    def progress_callback(progress):
+        """
+        Callback function to report progress of the object detection process.
+
+        Args:
+            progress (int): The current progress percentage (0 to 100).
+        """
+        print(f'Progress: {progress}%')  # Print the progress for debugging
+        socketio.emit('progress', {'progress': progress})  # Emit the progress via socket for real-time updates
+
+    # Initialize the ObjectDetection class with provided parameters
     detector = ObjectDetection(
-        capture=filepath, 
-        result=result_folder, 
-        court=court, 
-        tracknet_file=tracknet_file,
-        progress_callback=progress_callback
+        capture=filepath,          # Path to the input video file
+        result=result_folder,      # Directory to save the results
+        court=court,               # Court type for detection
+        tracknet_file=tracknet_file,  # Path to the TrackNet model file
+        progress_callback=progress_callback  # Set the progress callback function
     )
-    result_path = detector()
-    return result_path
+    
+    # Run the object detection process and store the result path
+    result_path = detector()  # Call the detector instance to perform detection
+
+    return result_path  # Return the path of the result video file
+
 
 @app.route('/')
 def index():
